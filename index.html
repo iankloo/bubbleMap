@@ -1,0 +1,380 @@
+<html>
+  <head>
+    
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+    
+    <style>
+      div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 100px;
+        height: 50px;
+        padding: 2px;
+        font: 16px sans-serif;
+        background: lightsteelblue;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+      }
+      
+      
+      
+      #play-button {
+      background: steelblue;
+      padding-right: 26px;
+      border-radius: 3px;
+      border: none;
+      color: white;
+      margin: 0;
+      padding: 0 12px;
+      width: 60px;
+      cursor: pointer;
+      height: 30px;
+    }
+
+    #play-button:hover {
+      background-color: #696969;
+    }    
+    
+    .ticks {
+      font-size: 10px;
+    }
+
+    .track,
+    .track-inset,
+    .track-overlay {
+      stroke-linecap: round;
+    }
+
+    .track {
+      stroke: #000;
+      stroke-opacity: 0.3;
+      stroke-width: 10px;
+    }
+
+    .track-inset {
+      stroke: #dcdcdc;
+      stroke-width: 8px;
+    }
+
+    .track-overlay {
+      pointer-events: stroke;
+      stroke-width: 50px;
+      stroke: transparent;
+      cursor: crosshair;
+    }
+
+    .handle {
+      fill: #fff;
+      stroke: #000;
+      stroke-opacity: 0.5;
+      stroke-width: 1.25px;
+    }
+      
+    body{
+      margin-left: 10%;
+      margin-right: 10%;
+    }
+
+    </style>
+    
+    
+  </head>
+  <body>
+    <center><h1>COVID-19 Infectious Probability by County</h1></center>
+    <div class = 'explain'>
+      <p>This visualization represents each county in the United States with a single circle.  The radius of each circle is based on the infectious probability in that county.  Use the time slider at the bottom to explore the changes in infectious probability over the course of the pandemic.</p>
+      <p>Unlike a typical map visualization, this methodology sacrifices geographical integrity for a more intuitive view of how the pandemic has changed over time.  For example, some circles may become so large that they crowd-out surrounding counties.  The idea of this visualization is not to make it easy to find exactly what is happening in individual counties (that is the strength of Bigmap).  Instead, the idea here is to explore the general trends and flows across the entire country.</p>
+    </div>
+    <div id="svg_here"></div>
+      <div id="vis">
+      <button id="play-button">Play</button>
+    </div>
+    
+
+  
+
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script>
+    
+    var width = 1000, height = 500
+    var margin = {top:50, right:50, bottom:0, left:50}
+    
+    //var svg = d3.select("body").append("svg").attr("width", width).attr("height", height)
+    var svg = d3.select("#svg_here").append("svg").attr("viewBox", `0 0 1000 650`)
+    
+    var div = d3.select("#svg_here").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+      
+    var formatDateIntoYear = d3.timeFormat("%b %Y");
+    var formatDate = d3.timeFormat("%b %d %Y");
+    var parseDate = d3.timeParse("%m/%d/%y");
+    var parseDate_new = d3.timeFormat("%Y-%m-%d");
+      
+  
+  
+      d3.json("county_data_all.json", function(err, dat) {
+        console.log(dat)
+        
+        var pixelLoc = d3.geoMercator();
+        pixelLoc.scale(300);
+        
+        var colvar = '2020-03-01'
+        
+        var minX = d3.min(dat, function(d) { return d.longitude; } );
+        var maxX = d3.max(dat, function(d) { return d.longitude; } );
+        var xScale = d3.scaleLinear().domain([minX, maxX]).range([100, 250]);
+    
+        var minY = d3.min(dat, function(d) { return d.latitude; } );
+        var maxY = d3.max(dat, function(d) { return d.latitude; } );
+        var yScale = d3.scaleLinear().domain([minY, maxY]).range([200,260]);
+
+        //var minRad = d3.min(dat, function(d) { return d.avg_ip;} );
+        //var maxRad = d3.max(dat, function(d) { return d.avg_ip;} );
+        //var pointScale = d3.scaleLinear().domain([minRad, maxRad]).range([5, 30]);
+        var pointScale = d3.scaleLinear().domain([0, 15]).range([1, 5]);
+        
+        nodes = []
+        for (i=0; i < dat.length; i++) {
+          node = dat[i];
+          node.x = xScale(pixelLoc([node.longitude, node.latitude])[0]);
+          node.y = yScale(pixelLoc([node.longitude, node.latitude])[1]);
+          node.radius = pointScale(node[colvar]);
+          nodes.push(node);
+        }
+        
+        console.log(nodes)
+        
+        var simulation = d3.forceSimulation()
+          //.force('charge', d3.forceManyBody().strength(0))
+          .force('center', d3.forceCenter(width / 2, height / 2))
+          .force('collision', d3.forceCollide().radius(function(d) {
+            return d.radius
+          }))
+
+        simulation
+          .nodes(nodes)
+          .on('tick', ticked)
+          //.stop();
+
+        iteration = 0
+        function ticked() {
+          iteration += 1
+          if(iteration > 10){
+            simulation.stop()
+          }          
+          console.log('go')
+
+          var u = d3.select('svg')
+            .selectAll('circle')
+            .data(nodes)
+        
+          u.enter()
+            .append('circle')
+            .attr('r', function(d) {
+              return d.radius
+            })
+            .merge(u)
+            .attr('cx', function(d) {
+              return d.x
+            })
+            .attr('cy', function(d) {
+              return d.y
+            })
+            .on("mouseover", function(d) {
+              div.transition()
+                 .duration(200)
+                 .style("opacity", .9);
+               div.html(d.name + "<br/>" + d[colvar])
+                 .style("left", (d3.event.pageX) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(d) {		
+                    div.transition()		
+                        .duration(500)		
+                        .style("opacity", 0);	
+                })
+            .attr('fill', 'steelblue')
+            .attr('stroke', 'white')
+            .attr('stroke-width', '.5')
+            
+
+          u.exit().remove()
+        }
+        
+        
+        
+        //slider
+    var moving = false;
+    var currentValue = 0;
+    var targetValue = 800;
+    
+    var startDate = new Date("2020-03-02"),
+        endDate = new Date("2021-01-11");
+    
+    var playButton = d3.select("#play-button");
+        
+    var x = d3.scaleTime()
+        .domain([startDate, endDate])
+        .range([0, targetValue])
+        .clamp(true);
+    
+    var slider = svg.append("g")
+        .attr("class", "slider")
+        .attr("transform", "translate(" + margin.left + "," + height*1.2 + ")");
+    
+    slider.append("line")
+        .attr("class", "track")
+        .attr("x1", x.range()[0])
+        .attr("x2", x.range()[1])
+      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-inset")
+      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-overlay")
+        .call(d3.drag()
+            .on("start.interrupt", function() { slider.interrupt(); })
+            .on("start drag", function() {
+              currentValue = d3.event.x;
+              update(x.invert(currentValue), dat); 
+            })
+        );
+    
+    slider.insert("g", ".track-overlay")
+        .attr("class", "ticks")
+        .attr("transform", "translate(0," + 18 + ")")
+      .selectAll("text")
+        .data(x.ticks(10))
+        .enter()
+        .append("text")
+        .attr("x", x)
+        .attr("y", 10)
+        .attr("text-anchor", "middle")
+        .text(function(d) { return formatDateIntoYear(d); });
+    
+    var handle = slider.insert("rect", ".track-overlay")
+        .attr("class", "handle")
+        .attr("width", 5)
+        .attr('height', 20)
+        .attr("transform", "translate(0," + (-10) + ")");
+    
+    var label = slider.append("text")  
+        .attr("class", "label")
+        .attr("text-anchor", "middle")
+        .text(formatDate(startDate))
+        .attr("transform", "translate(0," + (-25) + ")")
+      
+       
+         function update(h, dat) {
+          // update position and text of label according to slider scale
+          handle.attr("x", x(h));
+          label
+            .attr("x", x(h))
+            .text(formatDate(h));
+        
+          // filter data set and redraw plot
+          var colvar = parseDate_new(h)
+          var nodes = []
+          for (i=0; i < dat.length; i++) {
+            node = dat[i];
+            node.x = xScale(pixelLoc([node.longitude, node.latitude])[0]);
+            node.y = yScale(pixelLoc([node.longitude, node.latitude])[1]);
+            node.radius = pointScale(node[colvar]);
+            nodes.push(node);
+          }
+          console.log(parseDate_new(h))
+            
+            
+         var u = d3.select('svg')
+            .selectAll('circle')
+            .data(nodes)
+            
+            u.on("mouseover", function(d) {
+              div.transition()
+                 .duration(200)
+                 .style("opacity", .9);
+               div.html(d.State + "<br/>" + d[colvar])
+                 .style("left", (d3.event.pageX) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+            })
+            
+            u.transition()
+            //.duration(100)
+            .attr('r', function(d){
+              return d.radius
+            })
+            
+            
+            u.on("mouseover", function(d) {
+              div.transition()
+                 .duration(200)
+                 .style("opacity", .9);
+               div.html(d.name + "<br/>" + d[colvar])
+                 .style("left", (d3.event.pageX) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+            })
+            
+            
+            
+
+        
+         }
+         
+         
+         
+         
+         function step() {
+          update(x.invert(currentValue), dat);
+          currentValue = currentValue + (targetValue/151);
+          if (currentValue > targetValue) {
+            moving = false;
+            currentValue = 0;
+            clearInterval(timer);
+            // timer = 0;
+            playButton.text("Play");
+            console.log("Slider moving: " + moving);
+          }
+        }
+        
+        
+         playButton
+          .on("click", function() {
+          var button = d3.select(this);
+          if (button.text() == "Pause") {
+            moving = false;
+            clearInterval(timer);
+            // timer = 0;
+            button.text("Play");
+          } else {
+            moving = true;
+            timer = setInterval(step, 100);
+            button.text("Pause");
+          }
+          console.log("Slider moving: " + moving);
+        })
+      
+      function prepare(d) {
+        d.id = d.id;
+        d.date = parseDate(d.date);
+        return d;
+      }
+        
+        
+        
+        
+
+      })
+      
+      
+      
+    
+
+
+    </script>
+  </body>
+</html>
